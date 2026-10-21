@@ -2,5 +2,7 @@
   "name": "ProblemRadar - Internet Problems, Online Businesses & AI Agents",
   "description": "Discover 1 year of everyday and business problems from Reddit, see online businesses making monthly revenue (MRR) solving them, and clone AI agent solutions.",
   "requestFramePermissions": [],
-  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
 }
