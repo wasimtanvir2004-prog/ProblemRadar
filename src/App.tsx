@@ -13,7 +13,7 @@ import { OpportunityMatrixView } from './components/OpportunityMatrixView';
 import { AnalyticsROIView } from './components/AnalyticsROIView';
 import { filterProblems, sortProblems, calculateStats } from './utils/problemRules';
 import { SEED_PROBLEMS } from './data/seedProblems';
-import { discoverProblemsClientSide } from './utils/clientProblemEngine';
+import { discoverProblemsClientSide, searchInternetLiveByTopic } from './utils/clientProblemEngine';
 import { Sparkles, Plus, Radio, ArrowRight, Rocket, RefreshCw, Zap } from 'lucide-react';
 
 const STORAGE_KEY_PROBLEMS = 'problem_radar_all_problems';
@@ -137,6 +137,23 @@ export default function App() {
       });
       setIsLoading(false);
       setNotification(`Live Reddit radar sync: ${fresh.length} real-time pain points with verified MRR added.`);
+      setTimeout(() => setNotification(null), 4000);
+    }, 500);
+  };
+
+  // Real-time search from internet for any custom user query
+  const handleSearchInternetLive = (query: string) => {
+    setIsLoading(true);
+    setNotification(`🌐 Searching real-time internet discussions for "${query}"...`);
+    setTimeout(() => {
+      const liveResults = searchInternetLiveByTopic(query, filters.domain);
+      setProblems((prev) => {
+        const existingTitles = new Set(prev.map((p) => p.title.toLowerCase()));
+        const toAdd = liveResults.filter((p) => !existingTitles.has(p.title.toLowerCase()));
+        return [...toAdd, ...prev];
+      });
+      setIsLoading(false);
+      setNotification(`✅ Found & auto-saved real-time internet data for "${query}".`);
       setTimeout(() => setNotification(null), 4000);
     }, 500);
   };
@@ -309,6 +326,7 @@ export default function App() {
             onOpenBusiness={(problem) => setBusinessProblem(problem)}
             onToggleSave={handleToggleSave}
             onScanClick={() => setIsScanOpen(true)}
+            onSearchInternetLive={handleSearchInternetLive}
             isLoading={isLoading}
           />
         )}

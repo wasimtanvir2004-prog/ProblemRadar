@@ -65,6 +65,16 @@ export function filterProblems(problems: Problem[], filters: FilterOptions): Pro
       if (filters.revenueTier === 'starter_mrr' && rev >= 5000) return false;
     }
 
+    // Source Type match: live vs 1-year historical archive
+    if (filters.sourceType && filters.sourceType !== 'all') {
+      const isLiveItem = problem.isLive === true || 
+                         problem.id.startsWith('prob-discovered-') || 
+                         problem.id.startsWith('prob-custom-') || 
+                         new Date(problem.source.postedAt).getTime() > (now - 14 * 24 * 60 * 60 * 1000);
+      if (filters.sourceType === 'live' && !isLiveItem) return false;
+      if (filters.sourceType === 'archive' && isLiveItem) return false;
+    }
+
     // Time Range match across past 1 year timeline
     if (filters.timeRange && filters.timeRange !== 'all_year') {
       const problemTime = new Date(problem.source.postedAt).getTime();

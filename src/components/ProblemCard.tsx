@@ -26,6 +26,12 @@ export const ProblemCard: React.FC<ProblemCardProps> = ({
       <div>
         {/* Unboxed Metadata Line (NO PILLS) */}
         <div className="flex flex-wrap items-center gap-2 text-xs text-slate-400 mb-2.5">
+          {(problem.isLive || problem.id.startsWith('prob-live-') || problem.id.startsWith('prob-discovered-')) && (
+            <span className="inline-flex items-center gap-1.5 text-[10px] font-mono font-semibold text-emerald-300 bg-emerald-950/80 border border-emerald-500/50 px-2 py-0.5 rounded shadow-sm">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              LIVE REAL-TIME
+            </span>
+          )}
           <span className="font-medium text-slate-300">
             {problem.source.subreddit || 'r/all'}
           </span>

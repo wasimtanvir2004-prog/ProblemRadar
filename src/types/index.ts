@@ -123,6 +123,7 @@ export interface Problem {
   aiSolvability: AISolvability;
   status: 'unsolved' | 'analyzing' | 'agent_ready' | 'agent_deployed';
   isSaved?: boolean;
+  isLive?: boolean;
   agentSolution?: AgentSolution;
   onlineBusiness?: OnlineBusinessSolution; // Online business making money from solving this problem
 }
@@ -135,6 +136,7 @@ export interface FilterOptions {
   sortBy: 'opportunity' | 'revenue' | 'trending' | 'newest' | 'solvability';
   timeRange: 'all_year' | 'last_30_days' | 'last_90_days' | 'last_6_months' | 'last_1_year' | string;
   revenueTier: 'all' | 'high_mrr' | 'mid_mrr' | 'starter_mrr';
+  sourceType?: 'all' | 'live' | 'archive';
 }
 
 export interface ProblemStats {

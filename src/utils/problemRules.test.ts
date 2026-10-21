@@ -202,3 +202,24 @@ test('formatMRR formats currency figures properly', () => {
   assert.equal(formatMRR(34500), '$34,500/mo');
   assert.equal(formatMRR(0), 'Pre-revenue / New');
 });
+
+test('filterProblems filters by sourceType live vs archive', () => {
+  const baseFilter: FilterOptions = {
+    domain: 'all',
+    category: 'all',
+    searchQuery: '',
+    severity: 'all',
+    sortBy: 'opportunity',
+    timeRange: 'all_year',
+    revenueTier: 'all',
+  };
+
+  const live = filterProblems(mockProblems, { ...baseFilter, sourceType: 'live' });
+  // prob-1 is from 2026-10-15 (within last 14 days)
+  assert.equal(live.length, 1);
+  assert.equal(live[0].id, 'prob-1');
+
+  const archive = filterProblems(mockProblems, { ...baseFilter, sourceType: 'archive' });
+  // prob-2 (April 2026) and prob-3 (Nov 2025) are historical
+  assert.equal(archive.length, 2);
+});

@@ -1,7 +1,7 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Problem, FilterOptions } from '../types';
 import { ProblemCard } from './ProblemCard';
-import { Search, Sparkles, AlertCircle, Calendar, DollarSign, ArrowUpDown } from 'lucide-react';
+import { Search, Sparkles, AlertCircle, Calendar, DollarSign, ArrowUpDown, Zap, History, Globe } from 'lucide-react';
 import { formatMRR } from '../utils/problemRules';
 
 interface ProblemStreamProps {
@@ -13,6 +13,7 @@ interface ProblemStreamProps {
   onOpenBusiness?: (problem: Problem) => void;
   onToggleSave: (problemId: string) => void;
   onScanClick: () => void;
+  onSearchInternetLive?: (query: string) => void;
   isLoading: boolean;
 }
 
@@ -25,15 +26,73 @@ export const ProblemStream: React.FC<ProblemStreamProps> = ({
   onOpenBusiness,
   onToggleSave,
   onScanClick,
+  onSearchInternetLive,
   isLoading,
 }) => {
   // Calculate total MRR of the currently filtered view
   const currentTotalMRR = problems.reduce((acc, p) => acc + (p.onlineBusiness?.monthlyRevenue || 0), 0);
+  const [isSearchingLive, setIsSearchingLive] = useState(false);
+
+  const handleTriggerLiveSearch = async (queryText?: string) => {
+    const q = (queryText || filters.searchQuery || '').trim();
+    if (!q || !onSearchInternetLive) return;
+    setIsSearchingLive(true);
+    try {
+      await onSearchInternetLive(q);
+    } finally {
+      setIsSearchingLive(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
       {/* Primary Controls Bar: Domain Tabs + Search */}
       <div className="space-y-3 p-4 rounded-xl bg-slate-900/60 border border-slate-800">
+        {/* Source Mode Switcher: All | Live Real-Time | 1-Year Archive */}
+        <div className="flex flex-wrap items-center justify-between gap-3 pb-3 border-b border-slate-800/80">
+          <div className="flex items-center gap-1.5 p-1 bg-slate-950/80 rounded-lg border border-slate-800">
+            <button
+              onClick={() => setFilters((prev) => ({ ...prev, sourceType: 'all' }))}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${
+                (!filters.sourceType || filters.sourceType === 'all')
+                  ? 'bg-emerald-500 text-slate-950 shadow-sm font-semibold'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Globe className="w-3.5 h-3.5" />
+              <span>All Problems</span>
+            </button>
+            <button
+              onClick={() => setFilters((prev) => ({ ...prev, sourceType: 'live' }))}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${
+                filters.sourceType === 'live'
+                  ? 'bg-emerald-500 text-slate-950 shadow-sm font-semibold'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <Zap className="w-3.5 h-3.5 fill-current" />
+              <span>⚡ Live Real-Time</span>
+            </button>
+            <button
+              onClick={() => setFilters((prev) => ({ ...prev, sourceType: 'archive' }))}
+              className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center gap-1.5 ${
+                filters.sourceType === 'archive'
+                  ? 'bg-emerald-500 text-slate-950 shadow-sm font-semibold'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              <History className="w-3.5 h-3.5" />
+              <span>🗂 1-Year Archive</span>
+            </button>
+          </div>
+
+          {/* Automatic Save Indicator */}
+          <div className="flex items-center gap-2 text-[11px] font-mono text-emerald-400 bg-emerald-950/50 border border-emerald-500/30 px-2.5 py-1 rounded-md">
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>Auto-Saved to Storage</span>
+          </div>
+        </div>
+
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
           {/* Left: Domain Segmented Control */}
           <div className="flex items-center gap-1 p-1 bg-slate-950/80 rounded-lg border border-slate-800 shrink-0">
@@ -45,7 +104,7 @@ export const ProblemStream: React.FC<ProblemStreamProps> = ({
                   : 'text-slate-400 hover:text-slate-200'
               }`}
             >
-              All Problems
+              All Domains
             </button>
             <button
               onClick={() => setFilters((prev) => ({ ...prev, domain: 'business' }))}
@@ -69,17 +128,62 @@ export const ProblemStream: React.FC<ProblemStreamProps> = ({
             </button>
           </div>
 
-          {/* Search Box */}
-          <div className="relative flex-1 max-w-md">
-            <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              placeholder="Search problems, keywords, or online business names..."
-              value={filters.searchQuery}
-              onChange={(e) => setFilters((prev) => ({ ...prev, searchQuery: e.target.value }))}
-              className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-950/80 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
-            />
+          {/* Search Box with Real-Time Internet Search Action */}
+          <div className="flex items-center gap-2 flex-1 max-w-lg">
+            <div className="relative flex-1">
+              <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                placeholder="Search archive or type requirement (e.g. shopify, invoices)..."
+                value={filters.searchQuery}
+                onChange={(e) => setFilters((prev) => ({ ...prev, searchQuery: e.target.value }))}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' && filters.searchQuery.trim()) {
+                    handleTriggerLiveSearch();
+                  }
+                }}
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-950/80 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:outline-none focus:border-emerald-500"
+              />
+            </div>
+
+            {/* Direct 1-Click "Find Live" button */}
+            {onSearchInternetLive && (
+              <button
+                type="button"
+                onClick={() => handleTriggerLiveSearch()}
+                disabled={isSearchingLive}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold bg-emerald-400 hover:bg-emerald-300 disabled:opacity-50 text-slate-950 rounded-lg shrink-0 transition-colors shadow-sm"
+                title="Search internet for this requirement in real-time"
+              >
+                <Zap className="w-3.5 h-3.5 fill-slate-950" />
+                <span>{isSearchingLive ? 'Scanning...' : 'Find Live'}</span>
+              </button>
+            )}
           </div>
+        </div>
+
+        {/* Quick Requirement Chips */}
+        <div className="flex flex-wrap items-center gap-1.5 pt-1 text-[11px] text-slate-400">
+          <span className="text-slate-500 font-mono">Popular:</span>
+          {[
+            'Freelance Invoicing',
+            'Shopify Inventory',
+            'Lease Security Deposits',
+            'Meal Planning & Food Waste',
+            'Elderly Care & Medication',
+            'Solopreneur Tax Receipts',
+          ].map((topic) => (
+            <button
+              key={topic}
+              onClick={() => {
+                setFilters((prev) => ({ ...prev, searchQuery: topic }));
+                handleTriggerLiveSearch(topic);
+              }}
+              className="px-2 py-0.5 rounded bg-slate-950/60 hover:bg-slate-800 border border-slate-800 hover:border-slate-700 text-slate-300 hover:text-white transition-colors"
+            >
+              {topic}
+            </button>
+          ))}
         </div>
 
         {/* Secondary Filter Row: Time Range (1-Year Archive), Revenue Tier, Category, Sort */}
