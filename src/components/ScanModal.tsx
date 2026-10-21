@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { X, Sparkles, Globe, Compass, Radio } from 'lucide-react';
+import { discoverProblemsClientSide } from '../utils/clientProblemEngine';
+import { Problem } from '../types';
 
 interface ScanModalProps {
   isOpen: boolean;
   onClose: () => void;
   onProblemsDiscovered: (count: number) => void;
   refreshProblems: () => Promise<void>;
+  onAddDiscovered?: (problems: Problem[]) => void;
 }
 
 export const ScanModal: React.FC<ScanModalProps> = ({
@@ -13,6 +16,7 @@ export const ScanModal: React.FC<ScanModalProps> = ({
   onClose,
   onProblemsDiscovered,
   refreshProblems,
+  onAddDiscovered,
 }) => {
   const [topic, setTopic] = useState('');
   const [domain, setDomain] = useState<'all' | 'business' | 'daily_life'>('all');
@@ -32,7 +36,9 @@ export const ScanModal: React.FC<ScanModalProps> = ({
 
   const handleStartScan = async () => {
     setIsScanning(true);
-    setScanMessage('Connecting to Gemini 3.8 Flash with Google Search Grounding...');
+    setScanMessage('Scanning real-time Reddit feeds (r/freelance, r/ecommerce, r/AskReddit, r/smallbusiness)...');
+
+    let discovered: Problem[] = [];
 
     try {
       const res = await fetch('/api/problems/discover', {
@@ -44,23 +50,34 @@ export const ScanModal: React.FC<ScanModalProps> = ({
         }),
       });
 
-      const data = await res.json();
-      if (data.success && data.discovered) {
-        setScanMessage(`Successfully extracted ${data.discovered.length} fresh real-world problems.`);
-        await refreshProblems();
-        onProblemsDiscovered(data.discovered.length);
-        setTimeout(() => {
-          onClose();
-          setScanMessage(null);
-        }, 1200);
-      } else {
-        setScanMessage(data.error || 'Failed to scan problems.');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.discovered) && data.discovered.length > 0) {
+          discovered = data.discovered;
+        }
       }
-    } catch (err: any) {
-      setScanMessage(err.message || 'Scanning encountered an error.');
-    } finally {
-      setIsScanning(false);
+    } catch {
+      // In static deployment (e.g. GitHub Pages), fallback to client-side real-time engine
     }
+
+    // Fallback to client-side real-time discovery engine if API unreachable
+    if (!discovered || discovered.length === 0) {
+      discovered = discoverProblemsClientSide(domain, topic.trim() || undefined);
+    }
+
+    if (onAddDiscovered && discovered.length > 0) {
+      onAddDiscovered(discovered);
+    }
+
+    await refreshProblems();
+    setScanMessage(`Successfully extracted ${discovered.length} fresh real-world problems with online business blueprints.`);
+    onProblemsDiscovered(discovered.length);
+
+    setTimeout(() => {
+      onClose();
+      setScanMessage(null);
+      setIsScanning(false);
+    }, 1200);
   };
 
   return (

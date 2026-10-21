@@ -1,16 +1,20 @@
 import React, { useState } from 'react';
 import { X, PlusCircle, Sparkles } from 'lucide-react';
+import { analyzeRawProblemClientSide } from '../utils/clientProblemEngine';
+import { Problem } from '../types';
 
 interface AddProblemModalProps {
   isOpen: boolean;
   onClose: () => void;
   onProblemAdded: () => Promise<void>;
+  onAddProblemDirectly?: (problem: Problem) => void;
 }
 
 export const AddProblemModal: React.FC<AddProblemModalProps> = ({
   isOpen,
   onClose,
   onProblemAdded,
+  onAddProblemDirectly,
 }) => {
   const [rawText, setRawText] = useState('');
   const [optionalUrl, setOptionalUrl] = useState('');
@@ -26,6 +30,8 @@ export const AddProblemModal: React.FC<AddProblemModalProps> = ({
     setIsSubmitting(true);
     setErrorMessage(null);
 
+    let added = false;
+
     try {
       const res = await fetch('/api/problems/add', {
         method: 'POST',
@@ -36,20 +42,28 @@ export const AddProblemModal: React.FC<AddProblemModalProps> = ({
         }),
       });
 
-      const data = await res.json();
-      if (data.success) {
-        await onProblemAdded();
-        onClose();
-        setRawText('');
-        setOptionalUrl('');
-      } else {
-        setErrorMessage(data.error || 'Failed to add problem');
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.problem) {
+          if (onAddProblemDirectly) onAddProblemDirectly(data.problem);
+          added = true;
+        }
       }
-    } catch (err: any) {
-      setErrorMessage(err.message || 'Error communicating with server');
-    } finally {
-      setIsSubmitting(false);
+    } catch {
+      // In static GitHub Pages deployment, fallback to client-side analyzer
     }
+
+    if (!added) {
+      // Fallback: analyze client-side
+      const newProblem = analyzeRawProblemClientSide(rawText.trim(), optionalUrl.trim() || undefined);
+      if (onAddProblemDirectly) onAddProblemDirectly(newProblem);
+    }
+
+    await onProblemAdded();
+    onClose();
+    setRawText('');
+    setOptionalUrl('');
+    setIsSubmitting(false);
   };
 
   const handlePasteExample = () => {

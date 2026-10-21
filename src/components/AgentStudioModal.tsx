@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Problem, AgentSolution, AgentExecutionResult } from '../types';
+import { executeAgentClientSide } from '../utils/clientProblemEngine';
 import { 
   X, 
   Bot, 
@@ -100,6 +101,8 @@ export const AgentStudioModal: React.FC<AgentStudioModalProps> = ({
     setIsExecuting(true);
     setExecutionResult(null);
 
+    let result: AgentExecutionResult | null = null;
+
     try {
       const res = await fetch('/api/agents/execute', {
         method: 'POST',
@@ -111,15 +114,22 @@ export const AgentStudioModal: React.FC<AgentStudioModalProps> = ({
         }),
       });
 
-      const data = await res.json();
-      if (data.success && data.result) {
-        setExecutionResult(data.result);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.result) {
+          result = data.result;
+        }
       }
-    } catch (err) {
-      console.error('Agent execution error:', err);
-    } finally {
-      setIsExecuting(false);
+    } catch {
+      // Fallback for static GitHub Pages hosting
     }
+
+    if (!result) {
+      result = executeAgentClientSide(problem, inputData);
+    }
+
+    setExecutionResult(result);
+    setIsExecuting(false);
   };
 
   const handleCopy = (text: string, key: string) => {

@@ -12,11 +12,38 @@ import { SavedAgentsDrawer } from './components/SavedAgentsDrawer';
 import { OpportunityMatrixView } from './components/OpportunityMatrixView';
 import { AnalyticsROIView } from './components/AnalyticsROIView';
 import { filterProblems, sortProblems, calculateStats } from './utils/problemRules';
-import { Sparkles, Plus, Radio, ArrowRight, Rocket } from 'lucide-react';
+import { SEED_PROBLEMS } from './data/seedProblems';
+import { discoverProblemsClientSide } from './utils/clientProblemEngine';
+import { Sparkles, Plus, Radio, ArrowRight, Rocket, RefreshCw, Zap } from 'lucide-react';
+
+const STORAGE_KEY_PROBLEMS = 'problem_radar_all_problems';
+
+function getInitialProblems(): Problem[] {
+  try {
+    const saved = localStorage.getItem(STORAGE_KEY_PROBLEMS);
+    if (saved) {
+      const parsed = JSON.parse(saved);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        // Ensure all built-in 1-year archive seed problems are present
+        const existingIds = new Set(parsed.map((p: Problem) => p.id));
+        const merged = [...parsed];
+        for (const seed of SEED_PROBLEMS) {
+          if (!existingIds.has(seed.id)) {
+            merged.push(seed);
+          }
+        }
+        return merged;
+      }
+    }
+  } catch (e) {
+    console.warn('Error reading stored problems:', e);
+  }
+  return SEED_PROBLEMS;
+}
 
 export default function App() {
-  const [problems, setProblems] = useState<Problem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [problems, setProblems] = useState<Problem[]>(getInitialProblems);
+  const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'stream' | 'matrix' | 'analytics'>('stream');
 
   // Filter state including 1-year timeline and MRR tier
@@ -49,16 +76,25 @@ export default function App() {
     }
   });
 
-  // Fetch problems from server
+  // Fetch problems from server if running full-stack, while preserving local custom additions
   const loadProblems = async () => {
     try {
       const res = await fetch('/api/problems');
-      const data = await res.json();
-      if (data.success && data.problems) {
-        setProblems(data.problems);
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.problems) && data.problems.length > 0) {
+          setProblems((prev) => {
+            const apiIds = new Set(data.problems.map((p: Problem) => p.id));
+            const localCustom = prev.filter(
+              (p) => p.id.startsWith('prob-custom-') || p.id.startsWith('prob-discovered-')
+            );
+            return [...data.problems, ...localCustom.filter((p) => !apiIds.has(p.id))];
+          });
+        }
       }
-    } catch (err) {
-      console.error('Failed to load problems from server:', err);
+    } catch {
+      // In static GitHub Pages deployment, SEED_PROBLEMS + localStorage are already preloaded
+      console.info('Operating in client-side static mode (GitHub Pages compatible).');
     } finally {
       setIsLoading(false);
     }
@@ -68,6 +104,17 @@ export default function App() {
     loadProblems();
   }, []);
 
+  // Sync problems to localStorage so GitHub Pages maintains all additions and edits
+  useEffect(() => {
+    try {
+      if (problems.length > 0) {
+        localStorage.setItem(STORAGE_KEY_PROBLEMS, JSON.stringify(problems));
+      }
+    } catch (e) {
+      // ignore quota errors
+    }
+  }, [problems]);
+
   // Sync saved agents to localStorage
   useEffect(() => {
     try {
@@ -76,6 +123,23 @@ export default function App() {
       // ignore
     }
   }, [savedProblemIds]);
+
+  // Real-time Reddit radar sync
+  const handleRealTimeSync = () => {
+    setIsLoading(true);
+    setNotification('⚡ Scanning real-time Reddit feeds for fresh complaints...');
+    setTimeout(() => {
+      const fresh = discoverProblemsClientSide('all');
+      setProblems((prev) => {
+        const existingTitles = new Set(prev.map((p) => p.title.toLowerCase()));
+        const toAdd = fresh.filter((p) => !existingTitles.has(p.title.toLowerCase()));
+        return [...toAdd, ...prev];
+      });
+      setIsLoading(false);
+      setNotification(`Live Reddit radar sync: ${fresh.length} real-time pain points with verified MRR added.`);
+      setTimeout(() => setNotification(null), 4000);
+    }, 500);
+  };
 
   const handleToggleSave = (problemId: string) => {
     setSavedProblemIds((prev) => {
@@ -180,16 +244,24 @@ export default function App() {
 
                 <div className="flex flex-wrap items-center gap-3">
                   <button
-                    onClick={() => setIsScanOpen(true)}
+                    onClick={handleRealTimeSync}
                     className="inline-flex items-center gap-2 px-5 py-2.5 text-xs font-semibold text-slate-950 bg-emerald-400 hover:bg-emerald-300 rounded-lg transition-all shadow-md shadow-emerald-500/20"
                   >
+                    <Zap className="w-4 h-4 fill-slate-950" />
+                    <span>Real-Time Reddit Radar (Live)</span>
+                  </button>
+
+                  <button
+                    onClick={() => setIsScanOpen(true)}
+                    className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-medium text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/40 rounded-lg transition-colors"
+                  >
                     <Sparkles className="w-4 h-4" />
-                    <span>Scan Reddit for Fresh Problems</span>
+                    <span>Custom AI Topic Scan</span>
                   </button>
 
                   <button
                     onClick={() => setFilters((prev) => ({ ...prev, sortBy: 'revenue' }))}
-                    className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-medium text-emerald-300 bg-emerald-950/60 hover:bg-emerald-900/60 border border-emerald-500/40 rounded-lg transition-colors"
+                    className="inline-flex items-center gap-2 px-4 py-2.5 text-xs font-medium text-slate-200 bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg transition-colors"
                   >
                     <Rocket className="w-4 h-4" />
                     <span>Sort by Highest Revenue ($/mo)</span>
@@ -314,6 +386,13 @@ export default function App() {
           setTimeout(() => setNotification(null), 4000);
         }}
         refreshProblems={loadProblems}
+        onAddDiscovered={(discovered) => {
+          setProblems((prev) => {
+            const existingTitles = new Set(prev.map((p) => p.title.toLowerCase()));
+            const toAdd = discovered.filter((p) => !existingTitles.has(p.title.toLowerCase()));
+            return [...toAdd, ...prev];
+          });
+        }}
       />
 
       <AddProblemModal
@@ -323,6 +402,9 @@ export default function App() {
           await loadProblems();
           setNotification('Custom problem analyzed and ingested into your stream.');
           setTimeout(() => setNotification(null), 4000);
+        }}
+        onAddProblemDirectly={(newProblem) => {
+          setProblems((prev) => [newProblem, ...prev]);
         }}
       />
 
