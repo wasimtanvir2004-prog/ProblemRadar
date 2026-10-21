@@ -16,6 +16,8 @@ const app = express();
 const PORT = 3000;
 
 app.use(express.json());
+app.use(express.static(path.resolve(__dirname, 'public')));
+app.use('/docs/images', express.static(path.resolve(__dirname, 'docs/images')));
 
 // Initialize server-side Gemini client with required headers
 const ai = new GoogleGenAI({
