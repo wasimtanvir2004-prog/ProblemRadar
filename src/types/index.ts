@@ -43,7 +43,7 @@ export interface AgentInputSchemaField {
   key: string;
   label: string;
   type: 'text' | 'textarea' | 'select' | 'number';
-  placeholder: string;
+  placeholder?: string;
   defaultValue?: string;
   options?: string[];
   helpText?: string;

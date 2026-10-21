@@ -13,7 +13,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const PORT = 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
 app.use(express.json());
 app.use(express.static(path.resolve(__dirname, 'public')));
@@ -73,6 +73,17 @@ async function callGeminiText(params: {
 
 // In-memory problems repository initialized with high-quality real seeds
 let problemsDatabase: Problem[] = [...SEED_PROBLEMS];
+
+// GET /api/health - Health check endpoint for cloud deployment platforms
+app.get('/api/health', (_req: Request, res: Response) => {
+  res.json({
+    status: 'ok',
+    timestamp: new Date().toISOString(),
+    uptime: process.uptime(),
+    problemsCount: problemsDatabase.length,
+    hasApiKey: Boolean(process.env.GEMINI_API_KEY),
+  });
+});
 
 // GET /api/problems - Retrieve all problems
 app.get('/api/problems', (_req: Request, res: Response) => {
